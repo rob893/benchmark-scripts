@@ -7,9 +7,9 @@ async function main(): Promise<void> {
 
   const { urls, authorizationToken } = config;
 
-  const mins = 0.1;
+  const mins = 10;
   const runTimeInMs = mins * 60 * 1000;
-  const requestsPerMin = 2000;
+  const requestsPerMin = 1000;
   const waitTimeMs = runTimeInMs / (requestsPerMin * mins);
 
   const data = {
@@ -39,7 +39,7 @@ async function main(): Promise<void> {
             //   headers: { 'x-correlation-id': '123' }
             // }),
             axios.get(url, {
-              headers: { authorization: `Bearer ${authorizationToken}`, 'x-correlation-id': '123' }
+              headers: { authorization: `Bearer ${authorizationToken}` }
             }),
           `Request number ${i} complete with no errors`,
           `Request number ${i} complete with error`
@@ -55,16 +55,20 @@ async function main(): Promise<void> {
     i++;
   }
 
-  // Wait for any requests to finish
-  await sleep(2000);
-
-  console.log('\n################### RESULTS ###################\n');
-
   let totalSucceeded = 0;
   let totalFailed = 0;
+
+  const urlResults: {
+    url: string;
+    requestNumber: number;
+    succeeded: number;
+    failed: number;
+    times: number[];
+  }[] = [];
+
   for (const [url, requests] of requestsMap) {
     try {
-      const { succeeded, failed, times } = (await Promise.all(requests)).reduce<{
+      const result = (await Promise.all(requests)).reduce<{
         succeeded: number;
         failed: number;
         times: number[];
@@ -77,28 +81,42 @@ async function main(): Promise<void> {
         { succeeded: 0, failed: 0, times: [] }
       );
 
-      totalSucceeded += succeeded;
-      totalFailed += failed;
+      totalSucceeded += result.succeeded;
+      totalFailed += result.failed;
 
-      const averageTime = times.reduce((prev, curr) => prev + curr, 0) / times.length;
-      const minTime = Math.min(...times);
-      const maxTime = Math.max(...times);
-
-      console.log(`Endpoint: ${url}`);
-      console.log(`Number of requests: ${requests.length}`);
-      console.log(`Average request time: ${averageTime}ms`);
-      console.log(`Max request time: ${maxTime}ms`);
-      console.log(`Min request time: ${minTime}ms`);
-      console.log(`25th percentile: ${q25(times)}ms`);
-      console.log(`50th percentile: ${q50(times)}ms`);
-      console.log(`75th percentile: ${q75(times)}ms`);
-      console.log(`95th percentile: ${q95(times)}ms`);
-      console.log(`Standard deviation: ${std(times)}`);
-      console.log('\n');
+      urlResults.push({
+        url,
+        requestNumber: requests.length,
+        ...result
+      });
     } catch (error) {
       console.error(`Error: ${error.message}`);
       console.error(error);
     }
+  }
+
+  console.log('\n################### RESULTS ###################\n');
+
+  for (const { url, requestNumber, succeeded, failed, times } of urlResults) {
+    const averageTime = times.reduce((prev, curr) => prev + curr, 0) / times.length;
+    const minTime = Math.min(...times);
+    const maxTime = Math.max(...times);
+    const successRate = (succeeded / requestNumber) * 100;
+    const failureRate = (failed / requestNumber) * 100;
+
+    console.log(`Endpoint: ${url}`);
+    console.log(`Number of requests: ${requestNumber}`);
+    console.log(`Success rate: ${successRate}%`);
+    console.log(`Failure rate: ${failureRate}%`);
+    console.log(`Average request time: ${averageTime}ms`);
+    console.log(`Max request time: ${maxTime}ms`);
+    console.log(`Min request time: ${minTime}ms`);
+    console.log(`25th percentile: ${q25(times)}ms`);
+    console.log(`50th percentile: ${q50(times)}ms`);
+    console.log(`75th percentile: ${q75(times)}ms`);
+    console.log(`95th percentile: ${q95(times)}ms`);
+    console.log(`Standard deviation: ${std(times)}`);
+    console.log('\n');
   }
 
   const endTime = Date.now();
@@ -108,7 +126,9 @@ async function main(): Promise<void> {
   const totalTimeM = totalTimeS / 60;
 
   console.log(
-    `Requests complete. ${totalSucceeded} total requests were successful. ${totalFailed} failed. Script took ${totalTimeMs} ms/${totalTimeS} seconds/${totalTimeM} minutes to run.`
+    `${
+      totalSucceeded + totalFailed
+    } requests complete. ${totalSucceeded} total requests were successful. ${totalFailed} failed. Script took ${totalTimeMs} ms/${totalTimeS} seconds/${totalTimeM} minutes to run.`
   );
 }
 
