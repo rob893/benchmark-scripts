@@ -5,11 +5,9 @@ import config from './config.json';
 async function main(): Promise<void> {
   const startTime = Date.now();
 
-  const { urls, authorizationToken } = config;
+  const { urls, authorizationToken, mins = 2, requestsPerMin = 1000 } = config as Record<string, any>;
 
-  const mins = 2;
   const runTimeInMs = mins * 60 * 1000;
-  const requestsPerMin = 1000;
   const waitTimeMs = runTimeInMs / (requestsPerMin * mins);
 
   console.log('starting...');
