@@ -7,17 +7,10 @@ async function main(): Promise<void> {
 
   const { urls, authorizationToken } = config;
 
-  const mins = 10;
+  const mins = 2;
   const runTimeInMs = mins * 60 * 1000;
   const requestsPerMin = 1000;
   const waitTimeMs = runTimeInMs / (requestsPerMin * mins);
-
-  const data = {
-    operationName: 'Test',
-    variables: {},
-    query:
-      'query Test {\n  getRoomReservationSimple(confirmationNumber: "123" lastName: "Joe") {\n    operaConfirmationNumber\n }\n}'
-  };
 
   console.log('starting...');
 
@@ -36,7 +29,7 @@ async function main(): Promise<void> {
         makeRequest(
           () =>
             // axios.post(url, data, {
-            //   headers: { 'x-correlation-id': '123' }
+            //   headers: { authorization: `Bearer ${authorizationToken}` }
             // }),
             axios.get(url, {
               headers: { authorization: `Bearer ${authorizationToken}` }
