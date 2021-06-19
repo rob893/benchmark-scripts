@@ -1,11 +1,11 @@
 import axios from 'axios';
 import { makeRequest, q25, q50, q75, q95, sleep, std, timeFunction } from './utils';
-import config from './config.json';
+import { config } from './config';
 
 async function main(): Promise<void> {
   const startTime = Date.now();
 
-  const { urls, authorizationToken, mins = 2, requestsPerMin = 1000 } = config as Record<string, any>;
+  const { requests, authorizationToken, mins = 2, requestsPerMin = 1000 } = config;
 
   const runTimeInMs = mins * 60 * 1000;
   const waitTimeMs = runTimeInMs / (requestsPerMin * mins);
@@ -17,28 +17,51 @@ async function main(): Promise<void> {
   let timer = 0;
   let i = 1;
   while (timer < runTimeInMs) {
-    const url = urls[i % urls.length];
+    const request = requests[i % requests.length];
+
+    const { url, method, body, authorizationToken: reqAuthToken } = request;
+    const tokenToUse = reqAuthToken ?? authorizationToken;
+
     console.log(`Sending request ${i}`);
 
-    const requests = requestsMap.get(url) ?? [];
+    const requestPromises = requestsMap.get(url) ?? [];
 
-    requests.push(
+    requestPromises.push(
       timeFunction(() =>
         makeRequest(
-          () =>
-            // axios.post(url, data, {
-            //   headers: { authorization: `Bearer ${authorizationToken}` }
-            // }),
-            axios.get(url, {
-              headers: { authorization: `Bearer ${authorizationToken}` }
-            }),
+          () => {
+            switch (method.toUpperCase()) {
+              case 'GET':
+                return axios.get(url, {
+                  headers: { authorization: tokenToUse ? `Bearer ${tokenToUse}` : undefined }
+                });
+              case 'POST':
+                return axios.post(url, body, {
+                  headers: { authorization: tokenToUse ? `Bearer ${tokenToUse}` : undefined }
+                });
+              case 'PUT':
+                return axios.put(url, body, {
+                  headers: { authorization: tokenToUse ? `Bearer ${tokenToUse}` : undefined }
+                });
+              case 'PATCH':
+                return axios.patch(url, body, {
+                  headers: { authorization: tokenToUse ? `Bearer ${tokenToUse}` : undefined }
+                });
+              case 'DELETE':
+                return axios.delete(url, {
+                  headers: { authorization: tokenToUse ? `Bearer ${tokenToUse}` : undefined }
+                });
+              default:
+                throw new Error('Invalid method.');
+            }
+          },
           `Request number ${i} complete with no errors`,
           `Request number ${i} complete with error`
         )
       )
     );
 
-    requestsMap.set(url, requests);
+    requestsMap.set(url, requestPromises);
 
     await sleep(waitTimeMs);
 

@@ -1,18 +1,3 @@
-# benchmark-scripts
-
-## Setup and usage
-
-- Add a `config.ts` file to the `src` directory with the following object:
-
-```typescript
-export const config: ScriptConfiguration = {
-  // Your config.
-};
-```
-
-- ScriptConfiguration has a schema of:
-
-```typescript
 export interface RequestObj<TBody = any> {
   /** The HTTP method of the request. */
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -34,7 +19,3 @@ export interface ScriptConfiguration {
   /** The requests to run the script with. */
   requests: RequestObj[];
 }
-```
-
-- `npm i` to install dependencies.
-- `npm start` to run the script
