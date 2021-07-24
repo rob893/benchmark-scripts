@@ -7,6 +7,7 @@ export interface RequestObj<TBody = any> {
   body?: TBody;
   /** (Optional) The authorization token to send with each request. This will override the token from global config. */
   authorizationToken?: string;
+  replacers?: { target: string; replaceWithOneOf: string[]; random?: boolean }[];
 }
 
 export interface ScriptConfiguration {

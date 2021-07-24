@@ -19,12 +19,20 @@ async function main(): Promise<void> {
   while (timer < runTimeInMs) {
     const request = requests[i % requests.length];
 
-    const { url, method, body, authorizationToken: reqAuthToken } = request;
+    const { url, method, body, authorizationToken: reqAuthToken, replacers } = request;
     const tokenToUse = reqAuthToken ?? authorizationToken;
 
     console.log(`Sending request ${i}`);
 
     const requestPromises = requestsMap.get(url) ?? [];
+
+    let urlToUse = url;
+
+    if (replacers) {
+      for (const { target, replaceWithOneOf } of replacers) {
+        urlToUse = urlToUse.replace(target, replaceWithOneOf[Math.floor(Math.random() * replaceWithOneOf.length)]);
+      }
+    }
 
     requestPromises.push(
       timeFunction(() =>
@@ -32,23 +40,23 @@ async function main(): Promise<void> {
           () => {
             switch (method.toUpperCase()) {
               case 'GET':
-                return axios.get(url, {
+                return axios.get(urlToUse, {
                   headers: { authorization: tokenToUse ? `Bearer ${tokenToUse}` : undefined }
                 });
               case 'POST':
-                return axios.post(url, body, {
+                return axios.post(urlToUse, body, {
                   headers: { authorization: tokenToUse ? `Bearer ${tokenToUse}` : undefined }
                 });
               case 'PUT':
-                return axios.put(url, body, {
+                return axios.put(urlToUse, body, {
                   headers: { authorization: tokenToUse ? `Bearer ${tokenToUse}` : undefined }
                 });
               case 'PATCH':
-                return axios.patch(url, body, {
+                return axios.patch(urlToUse, body, {
                   headers: { authorization: tokenToUse ? `Bearer ${tokenToUse}` : undefined }
                 });
               case 'DELETE':
-                return axios.delete(url, {
+                return axios.delete(urlToUse, {
                   headers: { authorization: tokenToUse ? `Bearer ${tokenToUse}` : undefined }
                 });
               default:
