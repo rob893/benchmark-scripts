@@ -2,6 +2,10 @@ import axios from 'axios';
 import { makeRequest, q25, q50, q75, q95, sleep, std, timeFunction } from './utils';
 import { config } from './config';
 
+function replaceAll(string: string, search: string, replace: string): string {
+  return string.split(search).join(replace);
+}
+
 async function main(): Promise<void> {
   const startTime = Date.now();
 
@@ -30,7 +34,7 @@ async function main(): Promise<void> {
 
     if (replacers) {
       for (const { target, replaceWithOneOf } of replacers) {
-        urlToUse = urlToUse.replace(target, replaceWithOneOf[Math.floor(Math.random() * replaceWithOneOf.length)]);
+        urlToUse = replaceAll(urlToUse, target, replaceWithOneOf[Math.floor(Math.random() * replaceWithOneOf.length)]);
       }
     }
 
