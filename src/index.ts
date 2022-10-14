@@ -1,6 +1,8 @@
 import axios from 'axios';
 import { makeRequest, q25, q50, q75, q95, sleep, std, timeFunction } from './utils';
 import { config } from './config';
+import { ConsoleReporter } from './reporters/ConsoleReporter';
+import { PerformanceResult, RequestPerformanceResult, RunReporter } from './models';
 
 function replaceAll(string: string, search: string, replace: string): string {
   return string.split(search).join(replace);
@@ -9,12 +11,18 @@ function replaceAll(string: string, search: string, replace: string): string {
 async function main(): Promise<void> {
   const startTime = Date.now();
 
-  const { requests, authorizationToken, mins = 2, requestsPerMin = 1000 } = config;
+  const {
+    requests,
+    authorizationToken,
+    mins = 2,
+    requestsPerMin = 1000,
+    reporters = [new ConsoleReporter()] as RunReporter[]
+  } = config;
 
   const runTimeInMs = mins * 60 * 1000;
   const waitTimeMs = runTimeInMs / (requestsPerMin * mins);
 
-  console.log('starting...');
+  reporters.forEach(r => r.onStart && r.onStart());
 
   const requestsMap: Map<string, Promise<{ time: number; success: boolean }>[]> = new Map();
 
@@ -26,7 +34,7 @@ async function main(): Promise<void> {
     const { url, method, body, authorizationToken: reqAuthToken, replacers } = request;
     const tokenToUse = reqAuthToken ?? authorizationToken;
 
-    console.log(`Sending request ${i}`);
+    reporters.forEach(r => r.onSendRequest && r.onSendRequest(request, i));
 
     const requestPromises = requestsMap.get(url) ?? [];
 
@@ -67,8 +75,12 @@ async function main(): Promise<void> {
                 throw new Error('Invalid method.');
             }
           },
-          `Request number ${i} complete with no errors`,
-          `Request number ${i} complete with error`
+          () => {
+            reporters.forEach(r => r.onRequestSuccess && r.onRequestSuccess(request, i));
+          },
+          error => {
+            reporters.forEach(r => r.onRequestError && r.onRequestError(request, i, error));
+          }
         )
       )
     );
@@ -116,46 +128,54 @@ async function main(): Promise<void> {
         ...result
       });
     } catch (error) {
-      console.error(`Error: ${error.message}`);
-      console.error(error);
+      reporters.forEach(r => r.onApplicationError && r.onApplicationError(error));
     }
   }
 
-  console.log('\n################### RESULTS ###################\n');
+  const requestResults: RequestPerformanceResult[] = urlResults.map(
+    ({ url: endpoint, requestNumber: numberOfRequests, succeeded, failed, times }) => {
+      const averageRequestTime = times.reduce((prev, curr) => prev + curr, 0) / times.length;
+      const minRequestTime = Math.min(...times);
+      const maxRequestTime = Math.max(...times);
+      const successRate = (succeeded / numberOfRequests) * 100;
+      const failureRate = (failed / numberOfRequests) * 100;
 
-  for (const { url, requestNumber, succeeded, failed, times } of urlResults) {
-    const averageTime = times.reduce((prev, curr) => prev + curr, 0) / times.length;
-    const minTime = Math.min(...times);
-    const maxTime = Math.max(...times);
-    const successRate = (succeeded / requestNumber) * 100;
-    const failureRate = (failed / requestNumber) * 100;
-
-    console.log(`Endpoint: ${url}`);
-    console.log(`Number of requests: ${requestNumber}`);
-    console.log(`Success rate: ${successRate}%`);
-    console.log(`Failure rate: ${failureRate}%`);
-    console.log(`Average request time: ${averageTime}ms`);
-    console.log(`Max request time: ${maxTime}ms`);
-    console.log(`Min request time: ${minTime}ms`);
-    console.log(`25th percentile: ${q25(times)}ms`);
-    console.log(`50th percentile: ${q50(times)}ms`);
-    console.log(`75th percentile: ${q75(times)}ms`);
-    console.log(`95th percentile: ${q95(times)}ms`);
-    console.log(`Standard deviation: ${std(times)}`);
-    console.log('\n');
-  }
+      return {
+        averageRequestTime,
+        endpoint,
+        failureRate,
+        successRate,
+        maxRequestTime,
+        minRequestTime,
+        numberOfRequests,
+        percentile25: q25(times),
+        percentile50: q50(times),
+        percentile75: q75(times),
+        percentile95: q95(times),
+        standardDeviation: std(times)
+      };
+    }
+  );
 
   const endTime = Date.now();
+  const totalTimeMS = endTime - startTime;
+  const totalTimeSeconds = totalTimeMS / 1000;
+  const totalTimeMinutes = totalTimeSeconds / 60;
 
-  const totalTimeMs = endTime - startTime;
-  const totalTimeS = totalTimeMs / 1000;
-  const totalTimeM = totalTimeS / 60;
+  const runResult: PerformanceResult = {
+    endTime,
+    totalTimeMS,
+    totalTimeSeconds,
+    totalTimeMinutes,
+    startTime,
+    totalFailed,
+    totalSucceeded,
+    requestResults
+  };
 
-  console.log(
-    `${
-      totalSucceeded + totalFailed
-    } requests complete. ${totalSucceeded} total requests were successful. ${totalFailed} failed. Script took ${totalTimeMs} ms/${totalTimeS} seconds/${totalTimeM} minutes to run.`
-  );
+  for (const reporter of reporters) {
+    reporter.generateReport(runResult);
+  }
 }
 
 main()

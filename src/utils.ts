@@ -30,18 +30,21 @@ export async function timeFunction<TResults = any>(
 
 export async function makeRequest<T = any>(
   httpFetch: () => Promise<T>,
-  successMessage?: string,
-  errorMessage?: string
+  onSuccess?: () => void,
+  onError?: (error: any) => void
 ): Promise<T> {
   try {
     const results = await httpFetch();
 
-    console.log(successMessage || 'Request complete without error.');
+    if (onSuccess) {
+      onSuccess();
+    }
 
     return results;
   } catch (error) {
-    console.error(errorMessage || `Request failed: ${error.message}`);
-    console.error(error);
+    if (onError) {
+      onError(error);
+    }
 
     throw error;
   }

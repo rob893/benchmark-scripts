@@ -7,6 +7,7 @@ export interface RequestObj<TBody = any> {
   body?: TBody;
   /** (Optional) The authorization token to send with each request. This will override the token from global config. */
   authorizationToken?: string;
+  /** (Optional) Replacers to target certain text and replace them with something else. */
   replacers?: { target: string; replaceWithOneOf: string[]; random?: boolean }[];
 }
 
@@ -19,4 +20,45 @@ export interface ScriptConfiguration {
   authorizationToken?: string;
   /** The requests to run the script with. */
   requests: RequestObj[];
+  /** (Optional) Reporters used to generate reports. Defaults to just ConsoleReporter. */
+  reporters?: RunReporter[];
+}
+
+export interface PerformanceResult {
+  startTime: number;
+  endTime: number;
+  totalSucceeded: number;
+  totalFailed: number;
+  totalTimeMS: number;
+  totalTimeSeconds: number;
+  totalTimeMinutes: number;
+  requestResults: RequestPerformanceResult[];
+}
+
+export interface RequestPerformanceResult {
+  endpoint: string;
+  numberOfRequests: number;
+  successRate: number;
+  failureRate: number;
+  averageRequestTime: number;
+  maxRequestTime: number;
+  minRequestTime: number;
+  percentile25: number;
+  percentile50: number;
+  percentile75: number;
+  percentile95: number;
+  standardDeviation: number;
+}
+
+export interface RunReporter {
+  generateReport(result: PerformanceResult): void;
+  onStart?(): void;
+  onSendRequest?<TReqBody>(request: RequestObj<TReqBody>, requestNumber: number): void;
+  onRequestSuccess?<TReqBody>(request: RequestObj<TReqBody>, requestNumber: number): void;
+  onRequestError?<TReqBody, TError extends Error>(
+    request: RequestObj<TReqBody>,
+    requestNumber: number,
+    error: TError
+  ): void;
+  onApplicationError?<TError extends Error>(error: TError): void;
 }
